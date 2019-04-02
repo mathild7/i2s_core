@@ -265,36 +265,23 @@ module i2s_core_regmap_regs #(
     
     
     generate 
-    if (IS_RECEIVER==1)
-      dpram #(
-         .DATA_WIDTH(DATA_WIDTH),
-         .RAM_WIDTH (ADDR_WIDTH - 1)
-      )
-      RECEIVER_MEM(
-         .clk     (wb_clk_i),
-         .rst     (wb_rst_i),
-         .din     (sbuf_din),
-         .wr_en   (mem_wr_receiver),
-         .rd_en   (mem_rd_receiver),
-         .wr_addr (sbuf_wr_adr),
-         .rd_addr (sbuf_rd_adr),
-         .dout    (sbuf_dout)
-      );
-   else
-      dpram #(
-         .DATA_WIDTH(DATA_WIDTH),
-         .RAM_WIDTH (ADDR_WIDTH - 1)
-      )
-      TRANSMITTER_MEM(
-         .clk    (wb_clk_i),
-         .rst    (wb_rst_i),
-         .din    (s_axis_tdata),
-         .wr_en  (mem_wr_transmitter),
-         .rd_en  (mem_rd_transmitter),
-         .wr_addr(wb_adr_i[ADDR_WIDTH - 2 : 0]),
-         .rd_addr(sample_addr),
-         .dout   (sample_data)
-      );
+    if (IS_RECEIVER==1) begin
+   end
+   else begin
+	fifo_32w_64d tx_fifo(m_aclk(axi_aclk), 
+			     s_aclk(/*TBD*/), 
+	        	     s_aresetn(/*TBD*/), //Slave is consumer
+		     	     s_axis_tvalid(tx_data_in_valid), 
+		     	     s_axis_tready(tx_data_in_rdy), 
+		     	     s_axis_tdata(tx_data_in), 
+		             s_axis_tlast(1'b0), 
+                     	     m_axis_tvalid(mms_axis_tvalid), //Master is producer
+                             m_axis_tready(1'b1), 
+                             m_axis_tdata(mms_axis_tdata), 
+                             m_axis_tlast(mms_axis_tlast), 
+                             axis_overflow(), 
+                             axis_underflow());
+   end
    endgenerate        
    
 assign zero=0;

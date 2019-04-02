@@ -175,26 +175,10 @@ module i2s_topm	#(
     output        mms_axi_bvalid,
     input         mms_axi_bready);
  
-  wire[DATA_WIDTH - 1 : 0] data_out;
-  wire config_rd, config_wr;
-  wire[DATA_WIDTH - 1 : 0] config_dout;
-  wire[DATA_WIDTH - 1 : 0] config_bits;
-  wire[DATA_WIDTH - 1 : 0] intmask_bits;
-  wire[DATA_WIDTH - 1 : 0] intstat_events;
-  wire[DATA_WIDTH - 1 : 0] intstat_dout;
-  wire intstat_rd, intstat_wr;
-  wire evt_hsbf, evt_lsbf;
-  wire mem_wr_receiver, mem_rd_receiver;
-  wire[ADDR_WIDTH - 2 : 0] sbuf_rd_adr, sbuf_wr_adr;
-  wire[DATA_WIDTH - 1 : 0] sbuf_dout, sbuf_din, zeros;
-  wire[5 : 0] conf_res;
-  wire[4 : 0] conf_ratio;
-  wire conf_swap, conf_inten, conf_en;
-  
-  wire[ADDR_WIDTH - 2 : 0] sample_addr;
-  wire[DATA_WIDTH - 1 : 0] sample_data;
-  wire zero;
-  wire mem_wr_transmitter, mem_rd_transmitter;
+ reg conf_en_bclk;
+ reg conf_swap_bclk;
+ reg [5:0] conf_res_bclk;
+ reg [4:0] conf_ratio_bclk;
 //-- TxConfig - Configuration register
 module i2s_core_regmap_regs #(
     .AXI_ADDR_WIDTH(),
@@ -233,49 +217,7 @@ module i2s_core_regmap_regs #(
 .ctrl_reg_mlsbf(), // Value of register 'ctrl_reg'(), field 'mlsbf'
 .ctrl_reg_mhsbf(), // Value of register 'ctrl_reg'(), field 'mhsbf'
 .ctrl_reg_samp_res(conf_res), // Value of register 'ctrl_reg'(), field 'samp_res'
-.ctrl_reg_freq_ratio(conf_ratio));  
-    
-    generate 
-    if (IS_RECEIVER==1) begin
-	fifo_32w_64d rx_fifo(m_aclk(i_bclk), 
-                         s_aclk(axi_aclk), 
-                         s_aresetn(axi_aresetn),
-                         //Consumer
-                         s_axis_tvalid(m_axis_tvalid), 
-                         s_axis_tready(m_axis_tready), 
-                         s_axis_tdata(m_axis_tdata), 
-                         s_axis_tlast(m_axis_tlast), 
-                         //Producer
-                         m_axis_tvalid(mms_axis_tvalid),
-                         m_axis_tready(1'b1), 
-                         m_axis_tdata(rx_data), 
-                         m_axis_tlast(1'b0), 
-                         //misc
-                         axis_overflow(), 
-                         axis_underflow());
-   end
-   else begin
-	fifo_32w_64d tx_fifo(m_aclk(axi_aclk), 
-                         s_aclk(i_bclk), 
-                         s_aresetn(!i_bclk_rst),
-                         //Consumer
-                         s_axis_tvalid(tx_data_valid), 
-                         s_axis_tready(tx_data_rdy), 
-                         s_axis_tdata(tx_data_in), 
-                         s_axis_tlast(1'b0), 
-                         //Producer
-                         m_axis_tvalid(s_axis_tvalid),
-                         m_axis_tready(s_axis_tready), 
-                         m_axis_tdata(s_axis_tdata), 
-                         m_axis_tlast(s_axis_tlast), 
-                         //misc
-                         axis_overflow(), 
-                         axis_underflow());
-   end
-   endgenerate        
-   
-assign zero=0;
-assign zeros=0;   
+.ctrl_reg_freq_ratio(conf_ratio));   
    
     generate 
    if (IS_RECEIVER==1)
@@ -285,23 +227,23 @@ assign zeros=0;
         .IS_RECEIVER(1)
      )
      RECEIVER_DEC(
-         .axi_clk      (axi_aclk),
-         .axi_reset_n  (axi_aresetn),
-         .conf_res     (conf_res),
-         .conf_ratio   (conf_ratio),
-         .conf_swap    (conf_swap),
-         .conf_en      (conf_en),
-         .i2s_sd_i     (i2s_sd_i),         
-         .sample_dat_i (zeros),
-         .sample_dat_o (sbuf_din),
-         .mem_rdwr     (mem_wr_receiver),
-         .sample_addr  (sbuf_wr_adr),
-         .evt_hsbf     (evt_hsbf),
-         .evt_lsbf     (evt_lsbf),
-         .i2s_sd_o     (),
-         .i2s_sck_o    (i2s_sck_o),
-         .i2s_ws_o     (i2s_ws_o)
-    );   
+        .i_bclk(i_bclk),
+        .i_ws_clk(i_wclk),
+        .conf_res(conf_res_bclk),
+        .conf_ratio(conf_ratio_bclk),
+        .conf_swap(conf_swap_bclk),
+        .conf_en(conf_en_bclk),
+        .s_axis_tdata(0),
+        .s_axis_tvalid(0),
+        .s_axis_tready(),
+        .s_axis_tlast(0),
+        .m_axis_tdata(m_axis_tdata),
+        .m_axis_tvalid(m_axis_tvalid),
+        .m_axis_tready(m_axis_tready),
+        .m_axis_tlast(m_axis_tvalid),
+        .tx_data(),
+        .rx_data(rx_data),
+   );      
    else
      i2s_codec #(
         .DATA_WIDTH(DATA_WIDTH),
@@ -309,21 +251,22 @@ assign zeros=0;
         .IS_RECEIVER(0)
      )
      TRANSMITTER_DEC(
-         .wb_clk_i     (wb_clk_i),
-         .conf_res     (conf_res),
-         .conf_ratio   (conf_ratio),
-         .conf_swap    (conf_swap),
-         .conf_en      (conf_en),
-         .i2s_sd_i     (zero),         
-         .sample_dat_i (sample_data),
-         .sample_dat_o (),
-         .mem_rdwr     (mem_rd_transmitter),
-         .sample_addr  (sample_addr),
-         .evt_hsbf     (evt_hsbf),
-         .evt_lsbf     (evt_lsbf),
-         .i2s_sd_o     (i2s_sd_o),
-         .i2s_sck_o    (i2s_sck_o),
-         .i2s_ws_o     (i2s_ws_o)
+        .i_bclk(i_bclk),
+        .i_ws_clk(i_wclk),
+        .conf_res(conf_res_bclk),
+        .conf_ratio(conf_ratio_bclk),
+        .conf_swap(conf_swap_bclk),
+        .conf_en(conf_en_bclk),
+        .s_axis_tdata(s_axis_tdata),
+        .s_axis_tvalid(s_axis_tvalid),
+        .s_axis_tready(s_axis_tready),
+        .s_axis_tlast(s_axis_tvalid),
+        .m_axis_tdata(),
+        .m_axis_tvalid(),
+        .m_axis_tready(1'b0),
+        .m_axis_tlast(),
+        .tx_data(tx_data),
+        .rx_data(),
      ); 
    endgenerate        
 endmodule    

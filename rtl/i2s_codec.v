@@ -113,34 +113,34 @@
 `timescale 1ns / 10ps
 
 module i2s_codec #(
-   parameter DATA_WIDTH  = 16,
+   parameter DATA_WIDTH  = 32,
    parameter ADDR_WIDTH  = 6,
    parameter IS_RECEIVER = 0)
    (
-      input i_bclk      ,
-      input i_ws_clk    ,
+      input wire i_bclk      ,
+      input wire i_ws_clk    ,
       //Config options
-      input conf_res    ,
-      input conf_ratio  ,
-      input conf_swap   ,
-      input conf_en     ,
+      input wire [4:0] conf_res    ,
+      input wire [5:0] conf_ratio  ,
+      input wire conf_swap   ,
+      input wire conf_en     ,
     /*
      * axi4 transmitter streaming interface *INPUT*
      */
-     input s_axis_tdata,
-     input s_axis_tvalid,
-     output s_axis_tready,
-     input s_axis_tlast,
+     input wire [DATA_WIDTH-1:0] s_axis_tdata,
+     input wire s_axis_tvalid,
+     output wire s_axis_tready,
+     input wire s_axis_tlast,
     /*
      * axi4 reciever streaming interface *OUTPUT*
      */
-      output m_axis_tdata,
+      output [DATA_WIDTH-1:0]  m_axis_tdata,
       output m_axis_tvalid,
       input m_axis_tready,
       output m_axis_tlast,
       
-      input tx_data,
-      output rx_data,
+      input wire  tx_data,
+      output wire rx_data,
    );      
 
 parameter IDLE=0;
@@ -150,7 +150,7 @@ parameter RX_WRITE=3;
 parameter SYNC=4;
 
 reg[8:0] temp_data=2**(ADDR_WIDTH-1);
-   
+   /*
 
  reg i2s_clk_en;
  reg [4:0] clk_cnt;
@@ -354,5 +354,5 @@ always@(posedge i_bclk)
                default: begin sd_ctrl  <=IDLE; end
             endcase
          end
-
+         */
 endmodule

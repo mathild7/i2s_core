@@ -117,42 +117,31 @@ module i2s_codec #(
    parameter ADDR_WIDTH  = 6,
    parameter IS_RECEIVER = 0)
    (
-      axi_clk     ,
-      i_bclk      ,
-      i_ws_clk    ,
-      conf_res    ,
-      conf_ratio  ,
-      conf_swap   ,
-      conf_en     ,
-      i2s_sd_i    ,
-      sample_dat_i,
-      sample_dat_o,
-      mem_rdwr    ,
-      sample_addr ,
-      evt_hsbf    ,
-      evt_lsbf    ,
-      i2s_sd_o    ,
-      i2s_sck_o   ,
-      i2s_ws_o    
+      input i_bclk      ,
+      input i_ws_clk    ,
+      //Config options
+      input conf_res    ,
+      input conf_ratio  ,
+      input conf_swap   ,
+      input conf_en     ,
+    /*
+     * axi4 transmitter streaming interface *INPUT*
+     */
+     input s_axis_tdata,
+     input s_axis_tvalid,
+     output s_axis_tready,
+     input s_axis_tlast,
+    /*
+     * axi4 reciever streaming interface *OUTPUT*
+     */
+      output m_axis_tdata,
+      output m_axis_tvalid,
+      input m_axis_tready,
+      output m_axis_tlast,
+      
+      input tx_data,
+      output rx_data,
    );      
-
-input axi_clk;     //-- wishbone clock
-input i_bclk,
-input i_ws,
-input[5:0] conf_res;  //-- sample resolution
-input[4:0] conf_ratio;  //-- clock divider ratio
-input conf_swap;     //-- left/right sample order
-input conf_en  ;     //-- transmitter/recevier enable
-input i2s_sd_i ;     //-- I2S serial data input         
-input[DATA_WIDTH - 1 : 0] sample_dat_i;  //-- audio data
-output[DATA_WIDTH - 1 : 0] sample_dat_o;  //-- audio data
-output mem_rdwr;     //-- sample buffer read/write
-output[ADDR_WIDTH - 2 : 0] sample_addr;  //-- address
-output evt_hsbf ;     //-- higher sample buf empty or full event
-output evt_lsbf ;     //-- lower sample buf empty or full event
-output i2s_sd_o ;     //-- I2S serial data output
-output i2s_sck_o;     //-- I2S clock output
-output i2s_ws_o;    //-- I2S word select output
 
 parameter IDLE=0;
 parameter WAIT_CLK=1;
@@ -174,8 +163,6 @@ reg[8:0] temp_data=2**(ADDR_WIDTH-1);
  reg imem_rdwr;
  wire receiver;
  reg[4:0] ws_cnt; // integer range 0 to 31;
- 
- reg i2s_sd_o,evt_lsbf,evt_hsbf;
    
 assign receiver = (IS_RECEIVER==1)?1'b1:1'b0;
 

@@ -113,86 +113,67 @@
 `timescale 1ns / 10ps
 
 module i2s_topm	#( 
-                   parameter  DATA_WIDTH=16,          
-                   parameter  ADDR_WIDTH=6,
-                   parameter  IS_RECEIVER=0
-                 )
-                 (
-                 
-  /*
-   * Core clocks
-   */ 
-  input wire i_wclk,
-  input wire i_bclk,
-    
-                 
- /*
-  * Input/output to codec
-  */
- input  wire i2s_sd_i,     //   --I2S data input for receiver
- output wire i2s_sck_o,    //   -- I2S clock out
- output wire i2s_mclk_o,
- output wire i2s_ws_o,     //   -- I2S word select out
- output wire i2s_sd_o,     //   -- I2S data output for transmitter
-
-     /*
-      * axi4 transmitter streaming interface *INPUT*
-      */
+    parameter  DATA_WIDTH=32,          
+    parameter  ADDR_WIDTH=6,
+    parameter  IS_RECEIVER=0
+)
+(                
+   /*
+    * Core clocks
+    */ 
+    input wire i_wclk,
+    input wire i_bclk,                 
+    /*
+     * Input/output to codec
+     */
+    input  wire i2s_sd_i,     //   --I2S data input for receiver
+    output wire i2s_sck_o,    //   -- I2S clock out
+    output wire i2s_mclk_o,
+    output wire i2s_ws_o,     //   -- I2S word select out
+    output wire i2s_sd_o,     //   -- I2S data output for transmitter
+    /*
+     * axi4 transmitter streaming interface *INPUT*
+     */
     input  wire [DATA_WIDTH-1:0]  s_axis_tdata,
-    input  wire [KEEP_WIDTH-1:0]  s_axis_tkeep,
     input  wire                   s_axis_tvalid,
     output wire                   s_axis_tready,
     input  wire                   s_axis_tlast,
-    input  wire [ID_WIDTH-1:0]    s_axis_tid,
-    input  wire [DEST_WIDTH-1:0]  s_axis_tdest,
-    input  wire [USER_WIDTH-1:0]  s_axis_tuser,
-
-     /*
-      * axi4 reciever streaming interface *OUTPUT*
-      */
+    /*
+     * axi4 reciever streaming interface *OUTPUT*
+     */
     output wire [DATA_WIDTH-1:0]  m_axis_tdata,
-    output wire [KEEP_WIDTH-1:0]  m_axis_tkeep,
     output wire                   m_axis_tvalid,
     input  wire                   m_axis_tready,
     output wire                   m_axis_tlast,
-    output wire [ID_WIDTH-1:0]    m_axis_tid,
-    output wire [DEST_WIDTH-1:0]  m_axis_tdest,
-    output wire [USER_WIDTH-1:0]  m_axis_tuser,
- 
-/*
- * Memory mapped axi4 slave
- */ 
-input         axi_aclk,
-input         axi_aresetn,
-
-//AXI Write Address Channel
-input [AXI_ADDR_WIDTH-1:0] mms_axi_awaddr,
-input [2:0]   mms_axi_awprot,
-input         mms_axi_awvalid,
-output        mms_axi_awready,
-
-//AXI Write Data Channel
-input [31:0]  mms_axi_wdata,
-input [3:0]   mms_axi_wstrb,
-input         mms_axi_wvalid,
-output        mms_axi_wready,
-
-//AXI Read Address Channel
-input [AXI_ADDR_WIDTH-1:0] mms_axi_araddr,
-input [2:0]   mms_axi_arprot,
-input         mms_axi_arvalid,
-output        mms_axi_arready,
-
-//Axi Read Data Channel
-output [31:0] mms_axi_rdata,
-output [1:0]  mms_axi_rresp,
-output        mms_axi_rvalid,
-input         mms_axi_rready,
-
-//AXI Write Resp channel
-output [1:0]  mms_axi_bresp,
-output        mms_axi_bvalid,
-input         mms_axi_bready);
+    /*
+     * Memory mapped axi4 slave
+     */ 
+    input         axi_aclk,
+    input         axi_aresetn,
+    //AXI Write Address Channel
+    input [AXI_ADDR_WIDTH-1:0] mms_axi_awaddr,
+    input [2:0]   mms_axi_awprot,
+    input         mms_axi_awvalid,
+    output        mms_axi_awready,
+    //AXI Write Data Channel
+    input [DATA_WIDTH-:0]  mms_axi_wdata,
+    input [3:0]   mms_axi_wstrb,
+    input         mms_axi_wvalid,
+    output        mms_axi_wready,
+    //AXI Read Address Channel
+    input [AXI_ADDR_WIDTH-1:0] mms_axi_araddr,
+    input [2:0]   mms_axi_arprot,
+    input         mms_axi_arvalid,
+    output        mms_axi_arready,
+    //Axi Read Data Channel
+    output [DATA_WIDTH-:0] mms_axi_rdata,
+    output [1:0]  mms_axi_rresp,
+    output        mms_axi_rvalid,
+    input         mms_axi_rready,
+    //AXI Write Resp channel
+    output [1:0]  mms_axi_bresp,
+    output        mms_axi_bvalid,
+    input         mms_axi_bready);
  
   wire[DATA_WIDTH - 1 : 0] data_out;
   wire config_rd, config_wr;
@@ -221,22 +202,27 @@ module i2s_core_regmap_regs #(
 
 .axi_aclk(axi_aclk),
 .axi_aresetn(axi_aresetn),
+    //AXI Write Address Channel
 .s_axi_awaddr(mms_axi_araddr),//Write is only necessary for CPU
 .s_axi_awprot(mms_axi_awprot),
 .s_axi_awvalid(mms_axi_awvalid),
 .s_axi_awready(mms_axi_awready),
+    //AXI Write Data Channel
 .s_axi_wdata(mms_axi_wdata),
 .s_axi_wstrb(mms_axi_wstrb),
 .s_axi_wvalid(mms_axi_wvalid),
 .s_axi_wready(mms_axi_wready),
+    //AXI Read Address Channel
 .s_axi_araddr(mms_axi_araddr),
 .s_axi_arprot(mms_axi_arprot),
 .s_axi_arvalid(mms_axi_arvalid),
 .s_axi_arready(mms_axi_arready),
+    //Axi Read Data Channel
 .s_axi_rdata(mms_axi_rdata),
 .s_axi_rresp(mms_axi_rresp),
 .s_axi_rvalid(mms_axi_rvalid),
 .s_axi_rready(mms_axi_rready),
+    //AXI Write Resp channel
 .s_axi_bresp(mms_axi_bresp),
 .s_axi_bvalid(mms_axi_bvalid),
 .s_axi_bready(mms_axi_bready),         
@@ -248,39 +234,43 @@ module i2s_core_regmap_regs #(
 .ctrl_reg_mhsbf(), // Value of register 'ctrl_reg'(), field 'mhsbf'
 .ctrl_reg_samp_res(conf_res), // Value of register 'ctrl_reg'(), field 'samp_res'
 .ctrl_reg_freq_ratio(conf_ratio));  
-
-
-
-     /*
-      * axi4 transmitter streaming interface *INPUT*
-      */
-    input  wire [DATA_WIDTH-1:0]  s_axis_tdata,
-    input  wire [KEEP_WIDTH-1:0]  s_axis_tkeep,
-    input  wire                   s_axis_tvalid,
-    output wire                   s_axis_tready,
-    input  wire                   s_axis_tlast,
-    input  wire [ID_WIDTH-1:0]    s_axis_tid,
-    input  wire [DEST_WIDTH-1:0]  s_axis_tdest,
-    input  wire [USER_WIDTH-1:0]  s_axis_tuser,
-    
     
     generate 
     if (IS_RECEIVER==1) begin
+	fifo_32w_64d rx_fifo(m_aclk(i_bclk), 
+                         s_aclk(axi_aclk), 
+                         s_aresetn(axi_aresetn),
+                         //Consumer
+                         s_axis_tvalid(m_axis_tvalid), 
+                         s_axis_tready(m_axis_tready), 
+                         s_axis_tdata(m_axis_tdata), 
+                         s_axis_tlast(m_axis_tlast), 
+                         //Producer
+                         m_axis_tvalid(mms_axis_tvalid),
+                         m_axis_tready(1'b1), 
+                         m_axis_tdata(rx_data), 
+                         m_axis_tlast(1'b0), 
+                         //misc
+                         axis_overflow(), 
+                         axis_underflow());
    end
    else begin
 	fifo_32w_64d tx_fifo(m_aclk(axi_aclk), 
-			     s_aclk(/*TBD*/), 
-	        	     s_aresetn(/*TBD*/), //Slave is consumer
-		     	     s_axis_tvalid(tx_data_in_valid), 
-		     	     s_axis_tready(tx_data_in_rdy), 
-		     	     s_axis_tdata(tx_data_in), 
-		             s_axis_tlast(1'b0), 
-                     	     m_axis_tvalid(mms_axis_tvalid), //Master is producer
-                             m_axis_tready(1'b1), 
-                             m_axis_tdata(mms_axis_tdata), 
-                             m_axis_tlast(mms_axis_tlast), 
-                             axis_overflow(), 
-                             axis_underflow());
+                         s_aclk(i_bclk), 
+                         s_aresetn(!i_bclk_rst),
+                         //Consumer
+                         s_axis_tvalid(tx_data_valid), 
+                         s_axis_tready(tx_data_rdy), 
+                         s_axis_tdata(tx_data_in), 
+                         s_axis_tlast(1'b0), 
+                         //Producer
+                         m_axis_tvalid(s_axis_tvalid),
+                         m_axis_tready(s_axis_tready), 
+                         m_axis_tdata(s_axis_tdata), 
+                         m_axis_tlast(s_axis_tlast), 
+                         //misc
+                         axis_overflow(), 
+                         axis_underflow());
    end
    endgenerate        
    

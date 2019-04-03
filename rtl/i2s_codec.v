@@ -140,7 +140,7 @@ module i2s_codec #(
       output m_axis_tlast,
       
       input wire  tx_data,
-      output wire rx_data,
+      output wire rx_data
    );      
 
 parameter IDLE=0;

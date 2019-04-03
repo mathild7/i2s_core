@@ -122,15 +122,16 @@ module i2s_topm	#(
     * Core clocks
     */ 
     input wire i_wclk,
-    input wire i_bclk,                 
+    input wire i_bclk,
+    input wire i_mclk,                 
     /*
      * Input/output to codec
      */
-    input  wire i2s_sd_i,     //   --I2S data input for receiver
     output wire i2s_sck_o,    //   -- I2S clock out
     output wire i2s_mclk_o,
     output wire i2s_ws_o,     //   -- I2S word select out
-    output wire i2s_sd_o,     //   -- I2S data output for transmitter
+    output wire i2s_tx_data_o,
+    input  wire i2s_rx_data_i,
     /*
      * axi4 transmitter streaming interface *INPUT*
      */
@@ -151,22 +152,22 @@ module i2s_topm	#(
     input         axi_aclk,
     input         axi_aresetn,
     //AXI Write Address Channel
-    input [AXI_ADDR_WIDTH-1:0] mms_axi_awaddr,
+    input [DATA_WIDTH-1:0] mms_axi_awaddr,
     input [2:0]   mms_axi_awprot,
     input         mms_axi_awvalid,
     output        mms_axi_awready,
     //AXI Write Data Channel
-    input [DATA_WIDTH-:0]  mms_axi_wdata,
+    input [DATA_WIDTH-1:0]  mms_axi_wdata,
     input [3:0]   mms_axi_wstrb,
     input         mms_axi_wvalid,
     output        mms_axi_wready,
     //AXI Read Address Channel
-    input [AXI_ADDR_WIDTH-1:0] mms_axi_araddr,
+    input [DATA_WIDTH-1:0] mms_axi_araddr,
     input [2:0]   mms_axi_arprot,
     input         mms_axi_arvalid,
     output        mms_axi_arready,
     //Axi Read Data Channel
-    output [DATA_WIDTH-:0] mms_axi_rdata,
+    output [DATA_WIDTH-1:0] mms_axi_rdata,
     output [1:0]  mms_axi_rresp,
     output        mms_axi_rvalid,
     input         mms_axi_rready,
@@ -180,9 +181,10 @@ module i2s_topm	#(
  reg [5:0] conf_res_bclk;
  reg [4:0] conf_ratio_bclk;
 //-- TxConfig - Configuration register
-module i2s_core_regmap_regs #(
-    .AXI_ADDR_WIDTH(),
-    .ASEADDR()) (
+ i2s_core_regmap_regs #(
+    .AXI_ADDR_WIDTH(DATA_WIDTH),
+    .BASEADDR(0)) 
+    i2s_regmap (
 
 .axi_aclk(axi_aclk),
 .axi_aresetn(axi_aresetn),
@@ -213,7 +215,7 @@ module i2s_core_regmap_regs #(
 .ctrl_reg_strobe(), // Strobe logic for register 'ctrl_reg' (pulsed when the register is written from the bus)
 .ctrl_reg_en(conf_en), // Value of register 'ctrl_reg'(), field 'en'
 .ctrl_reg_int_en(conf_inten), // Value of register 'ctrl_reg'(), field 'int_en'
-.ctrl_reg_ch_swapconf_swap(), // Value of register 'ctrl_reg'(), field 'ch_swap'
+.ctrl_reg_ch_swap(), // Value of register 'ctrl_reg'(), field 'ch_swap'
 .ctrl_reg_mlsbf(), // Value of register 'ctrl_reg'(), field 'mlsbf'
 .ctrl_reg_mhsbf(), // Value of register 'ctrl_reg'(), field 'mhsbf'
 .ctrl_reg_samp_res(conf_res), // Value of register 'ctrl_reg'(), field 'samp_res'
@@ -242,7 +244,7 @@ module i2s_core_regmap_regs #(
         .m_axis_tready(m_axis_tready),
         .m_axis_tlast(m_axis_tvalid),
         .tx_data(),
-        .rx_data(rx_data),
+        .rx_data(rx_data)
    );      
    else
      i2s_codec #(
@@ -250,7 +252,7 @@ module i2s_core_regmap_regs #(
         .ADDR_WIDTH(ADDR_WIDTH),
         .IS_RECEIVER(0)
      )
-     TRANSMITTER_DEC(
+     TRANSMITTER_DEC (
         .i_bclk(i_bclk),
         .i_ws_clk(i_wclk),
         .conf_res(conf_res_bclk),
@@ -266,7 +268,7 @@ module i2s_core_regmap_regs #(
         .m_axis_tready(1'b0),
         .m_axis_tlast(),
         .tx_data(tx_data),
-        .rx_data(),
+        .rx_data()
      ); 
    endgenerate        
 endmodule    

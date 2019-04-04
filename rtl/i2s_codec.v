@@ -129,7 +129,7 @@ module i2s_codec #(
      */
      input wire [DATA_WIDTH-1:0] s_axis_tdata,
      input wire s_axis_tvalid,
-     output wire s_axis_tready,
+     output reg s_axis_tready,
      input wire s_axis_tlast,
     /*
      * axi4 reciever streaming interface *OUTPUT*
@@ -139,8 +139,8 @@ module i2s_codec #(
       input m_axis_tready,
       output m_axis_tlast,
       
-      input wire  tx_data,
-      output wire rx_data,
+      output reg  tx_data,
+      input wire rx_data,
       output wire ws_clk_ret
    );      
 
@@ -149,6 +149,8 @@ parameter WAIT_CLK=1;
 parameter TRX_DATA=2;
 parameter RX_WRITE=3;
 parameter SYNC=4;
+parameter TX_DATA_CH0 = 1;
+parameter TX_DATA_CH1 = 2;
 
 reg[8:0] temp_data=2**(ADDR_WIDTH-1);
 
@@ -163,6 +165,9 @@ reg[8:0] temp_data=2**(ADDR_WIDTH-1);
  reg imem_rdwr;
  wire receiver;
  reg[4:0] ws_cnt; // integer range 0 to 31;
+ reg tx_ws_clk;
+ reg [2:0] codec_state;
+ reg [31:0] samp_data;
    
 assign receiver = (IS_RECEIVER==1)?1'b1:1'b0;
 
@@ -201,7 +206,7 @@ always@(negedge i_bclk) begin
             if(i_ws_clk) begin
                 s_axis_tready <= 1;
                 samp_data <= s_axis_tdata;
-                codec_state   <= TX_DATA;
+                codec_state   <= TX_DATA_CH0;
             end
             else begin
                 
@@ -248,131 +253,4 @@ always@(negedge i_bclk) begin
     end
 
 end endgenerate
-
-
-always@(posedge i_bclk)
-         if (conf_en == 1'b0) begin          //-- codec disabled
-            imem_rdwr   <= 1'b0;
-            sd_ctrl     <= IDLE;
-            data_in     <= 0;
-            bit_cnt     <= 0;
-            bits_to_trx <= 0;
-            new_word    <= 1'b0;
-            adr_cnt     <= 0;
-            evt_lsbf    <= 1'b0;
-            evt_hsbf    <= 1'b0;
-            i2s_sd_o    <= 1'b0;
-         end else begin
-            case (sd_ctrl)
-               IDLE : begin
-                  imem_rdwr <= 1'b0;
-                  if ((conf_res > 15) && (conf_res < 33)) begin
-                     bits_to_trx <= conf_res - 1;
-                  end else begin
-                     bits_to_trx <= 15;
-                  end
-                  if (conf_en ==1'b1) begin
-                     if ((ws_pos_edge == 1'b1 & conf_swap == 1'b1) ||
-                        (ws_neg_edge == 1'b1 & conf_swap == 1'b0)) begin
-                        if (receiver == 1'b1) begin        //-- recevier
-                           sd_ctrl <= WAIT_CLK;
-                        end else begin
-                           imem_rdwr <= 1'b1;  //-- read first data if transmitter
-                           sd_ctrl   <= TRX_DATA;
-                        end
-                     end
-                  end
-               end
-               WAIT_CLK : begin        //-- wait for first bit after WS
-                  adr_cnt  <= 0;
-                  bit_cnt  <= 0;
-                  new_word <= 1'b0;
-                  data_in  <= 0;
-                  if ((i2s_clk_en == 1'b1) && (neg_edge == 1'b0)) begin
-                     sd_ctrl <= TRX_DATA;
-                  end
-               end
-               TRX_DATA : begin         //-- transmit/receive serial data 
-                  imem_rdwr <= 1'b0;
-                  evt_hsbf  <= 1'b0;
-                  evt_lsbf  <= 1'b0;                  
-                  if ((ws_pos_edge == 1'b1) || (ws_neg_edge == 1'b1)) begin
-                     new_word <= 1'b1;
-                  end
-                  
-                  //-- recevier operation
-                  if (receiver == 1'b1) begin
-                     if ((i2s_clk_en == 1'b1) && (neg_edge == 1'b1)) begin
-                           if ((bit_cnt < bits_to_trx) && (new_word == 1'b0)) begin
-                              bit_cnt                        <= bit_cnt + 1;
-                              data_in[bits_to_trx - bit_cnt] <= i2s_sd_i;
-                           end else begin
-                              imem_rdwr                      <= 1'b1;
-                              data_in[bits_to_trx - bit_cnt] <= i2s_sd_i;
-                              sd_ctrl                        <= RX_WRITE;
-                           end                 
-                     end
-                  end
-                  //-- transmitter operation
-                  if (receiver == 1'b0) begin
-                        if ((i2s_clk_en == 1'b1) && (neg_edge == 1'b0)) begin
-                           if ((bit_cnt < bits_to_trx) && (new_word == 1'b0)) begin
-                              bit_cnt  <= bit_cnt + 1;
-                              i2s_sd_o <= sample_dat_i[bits_to_trx - bit_cnt];
-                           end else begin
-                              bit_cnt <= bit_cnt + 1;
-                              if (bit_cnt > bits_to_trx) begin
-                                 i2s_sd_o <= 1'b0;
-                              end else begin
-                                 i2s_sd_o <= sample_dat_i[0];
-                              end
-                              //-- transmitter address counter
-                              imem_rdwr <= 1'b1;
-                              adr_cnt   <= (adr_cnt + 1) % temp_data;
-                              if (adr_cnt == 2**(ADDR_WIDTH - 2) - 1) begin
-                                 evt_lsbf <= 1'b1;
-                              end else begin
-                                 evt_lsbf <= 1'b0;
-                              end
-                              if (adr_cnt == 2**(ADDR_WIDTH - 1) - 1) begin
-                                 evt_hsbf <= 1'b1;
-                              end else begin
-                                 evt_hsbf <= 1'b0;
-                              end
-                              sd_ctrl <= SYNC;
-                           end
-                        end                     
-                  end
-               end   
-               RX_WRITE : begin         //-- write received word to sample buffer
-                  imem_rdwr <= 1'b0;
-                  adr_cnt   <= (adr_cnt + 1) % temp_data;
-                  if (adr_cnt == 2**(ADDR_WIDTH - 2) - 1) begin
-                     evt_lsbf <= 1'b1;
-                  end else begin
-                     evt_lsbf <= 1'b0;
-                  end
-                  if (adr_cnt == 2**(ADDR_WIDTH - 1) - 1) begin
-                     evt_hsbf <= 1'b1;
-                  end else begin
-                     evt_hsbf <= 1'b0;
-                  end
-                  sd_ctrl <= SYNC; 
-               end
-               SYNC : begin            //-- synchronise with next word
-                  imem_rdwr <= 1'b0;
-                  evt_hsbf  <= 1'b0;
-                  evt_lsbf  <= 1'b0;
-                  bit_cnt   <= 0;
-                  if ((ws_pos_edge ==1'b1) || (ws_neg_edge == 1'b1)) begin
-                     new_word <= 1'b1;
-                  end  
-                 
-                  new_word <= 1'b0;
-                  data_in  <= 0;
-                  sd_ctrl  <= TRX_DATA;                     
-               end               
-               default: begin sd_ctrl  <=IDLE; end
-            endcase
-         end
 endmodule

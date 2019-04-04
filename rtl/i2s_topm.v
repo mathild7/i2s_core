@@ -177,10 +177,10 @@ module i2s_topm	#(
     output        mms_axi_bvalid,
     input         mms_axi_bready);
  
- reg conf_en_bclk;
- reg conf_swap_bclk;
- reg [5:0] conf_res_bclk;
- reg [4:0] conf_ratio_bclk;
+ wire conf_en_bclk;
+ wire conf_swap_bclk;
+ wire [5:0] conf_res_bclk;
+ wire [4:0] conf_ratio_bclk;
  
  bits_sync
  #(.BUS_WIDTH (13))

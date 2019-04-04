@@ -221,6 +221,14 @@ module i2s_topm	#(
 .ctrl_reg_samp_res(conf_res), // Value of register 'ctrl_reg'(), field 'samp_res'
 .ctrl_reg_freq_ratio(conf_ratio));   
    
+   
+ _bits_sync
+     #(.BUS_WIDTH (13))
+ bits_sync_0 (
+    .i_clk_b (i_bclk),
+    .i_data_a ({conf_en,conf_inten,conf_res,conf_ratio}),
+    .o_data_b ({conf_en_bclk,conf_inten_bclk,conf_res_bclk,conf_ratio_bclk})
+  );
     generate 
    if (IS_RECEIVER==1)
      i2s_codec #(

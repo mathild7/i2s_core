@@ -140,7 +140,8 @@ module i2s_codec #(
       output m_axis_tlast,
       
       input wire  tx_data,
-      output wire rx_data
+      output wire rx_data,
+      output wire ws_clk_ret
    );      
 
 parameter IDLE=0;
@@ -150,7 +151,6 @@ parameter RX_WRITE=3;
 parameter SYNC=4;
 
 reg[8:0] temp_data=2**(ADDR_WIDTH-1);
-   /*
 
  reg i2s_clk_en;
  reg [4:0] clk_cnt;
@@ -166,61 +166,6 @@ reg[8:0] temp_data=2**(ADDR_WIDTH-1);
    
 assign receiver = (IS_RECEIVER==1)?1'b1:1'b0;
 
-//-- I2S clock enable generation, master mode. The clock is a fraction of the
-//-- Wishbone bus clock, determined by the conf_ratio value.
-
-always@(posedge axi_clk) begin
-    if (conf_en ==1'b0) begin       //-- disabled
-       i2s_clk_en <= 1'b0;
-       clk_cnt    <= 0;
-       neg_edge   <= 1'b0;
-       toggle     <= 1'b0;
-    end 
-    else begin                   //  -- enabled
-       if (clk_cnt < (conf_ratio + 1)) begin
-          clk_cnt    <= (clk_cnt + 1) % 32;
-          i2s_clk_en <= 1'b0;
-       end else begin
-          clk_cnt    <= 0;
-          i2s_clk_en <= 1'b1;
-          neg_edge   <= !neg_edge;
-       end
-       toggle <= neg_edge;
-    end
-end
-
-
-//-- Process to generate word select signal, master mode
-assign  i2s_ws_o = i2s_ws;
-always@ (posedge axi_clk) begin
-    if (conf_en == 1'b0) begin
-       i2s_ws      <= 1'b0;
-       ws_cnt      <= 0;
-       ws_pos_edge <= 1'b0;
-       ws_neg_edge <= 1'b0;
-    end 
-    else begin
-       if ((i2s_clk_en == 1'b1) && (toggle == 1'b1)) begin
-          if (ws_cnt < bits_to_trx) begin
-             ws_cnt <= ws_cnt + 1;
-          end 
-          else begin
-             i2s_ws <= !i2s_ws;
-             ws_cnt <= 0;
-             if (i2s_ws == 1'b1) begin
-                ws_neg_edge <= 1'b1;
-             end 
-             else begin
-                ws_pos_edge <= 1'b1;
-             end
-          end
-       end 
-       else begin
-          ws_pos_edge <= 1'b0;
-          ws_neg_edge <= 1'b0;
-       end
-    end
-end
 //-- Logic to generate clock signal, master mode
 assign i2s_sck_o = toggle;
 
@@ -228,6 +173,82 @@ assign i2s_sck_o = toggle;
 assign  sample_addr  = adr_cnt[ADDR_WIDTH - 2:0];
 assign  mem_rdwr     = imem_rdwr;
 assign  sample_dat_o = data_in;
+
+assign ws_clk_ret = IS_RECEIVER?i_ws_clk:tx_ws_clk;
+
+
+generate if(IS_RECEIVER) begin
+always@(posedge i_bclk) begin
+    if(!conf_en) begin
+    
+    end
+    else begin
+    
+    end
+end
+end
+//Transmitter
+else begin
+always@(negedge i_bclk) begin
+    //Reset condition
+    if(!conf_en) begin
+    
+    end
+    else begin
+        s_axis_tready <= 0;
+        case(codec_state)
+        IDLE: begin
+            if(i_ws_clk) begin
+                s_axis_tready <= 1;
+                samp_data <= s_axis_tdata;
+                codec_state   <= TX_DATA;
+            end
+            else begin
+                
+            end
+         end
+         TX_DATA_CH0: begin
+            tx_ws_clk     <= 1;
+            if(bit_cnt > DATA_WIDTH-conf_res) begin
+                tx_data <= samp_data[bit_cnt];
+            end
+            else begin
+                tx_data <= 0;
+            end
+            
+            if(bit_cnt == 0) begin
+                codec_state <= TX_DATA_CH1;
+                bit_cnt = DATA_WIDTH;
+                samp_data <= s_axis_tdata;
+            end
+            else begin
+                bit_cnt <= bit_cnt - 1;
+            end
+         end
+         TX_DATA_CH1: begin
+            tx_ws_clk     <= 1;
+            if(bit_cnt > DATA_WIDTH-conf_res) begin
+                tx_data <= samp_data[bit_cnt];
+            end
+            else begin
+                tx_data <= 0;
+            end
+            
+            if(bit_cnt == 0) begin
+                codec_state <= TX_DATA_CH1;
+                bit_cnt = DATA_WIDTH;
+            end
+            else begin
+                bit_cnt <= bit_cnt - 1;
+            end
+         end
+         default: bit_cnt <= DATA_WIDTH;
+        endcase
+    end
+    end
+
+end endgenerate
+
 
 always@(posedge i_bclk)
          if (conf_en == 1'b0) begin          //-- codec disabled
@@ -354,5 +375,4 @@ always@(posedge i_bclk)
                default: begin sd_ctrl  <=IDLE; end
             endcase
          end
-         */
 endmodule

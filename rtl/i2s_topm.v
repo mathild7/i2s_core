@@ -135,6 +135,7 @@ module i2s_topm	#(
     /*
      * axi4 transmitter streaming interface *INPUT*
      */
+    input wire                    s_axis_clk,
     input  wire [DATA_WIDTH-1:0]  s_axis_tdata,
     input  wire                   s_axis_tvalid,
     output wire                   s_axis_tready,
@@ -180,10 +181,17 @@ module i2s_topm	#(
  reg conf_swap_bclk;
  reg [5:0] conf_res_bclk;
  reg [4:0] conf_ratio_bclk;
+ 
+ bits_sync
+ #(.BUS_WIDTH (13))
+ bits_sync_0 (
+    .i_clk_b (i_bclk),
+    .i_data_a({conf_en,conf_swap,conf_res,conf_ratio}),
+    .o_data_b({conf_en_bclk,conf_swap_bclk,conf_res_bclk,conf_ratio_bclk}));
 //-- TxConfig - Configuration register
  i2s_core_regmap_regs #(
     .AXI_ADDR_WIDTH(DATA_WIDTH),
-    .BASEADDR(0)) 
+    .BASEADDR(32'h8000_2000)) 
     i2s_regmap (
 
 .axi_aclk(axi_aclk),
@@ -220,7 +228,7 @@ module i2s_topm	#(
 .ctrl_reg_mhsbf(), // Value of register 'ctrl_reg'(), field 'mhsbf'
 .ctrl_reg_samp_res(conf_res), // Value of register 'ctrl_reg'(), field 'samp_res'
 .ctrl_reg_freq_ratio(conf_ratio));   
-   
+   assign s_axis_tready = 1;
     generate 
    if (IS_RECEIVER==1)
      i2s_codec #(

@@ -121,9 +121,9 @@ module i2s_topm	#(
    /*
     * Core clocks
     */ 
-    input wire i_wclk,
-    input wire i_bclk,
-    input wire i_mclk,                 
+    input wire clock_0_0048,
+    input wire clock_3_072,
+    input wire clock_12_288,                 
     /*
      * Input/output to codec
      */
@@ -138,7 +138,7 @@ module i2s_topm	#(
     input wire                    s_axis_clk,
     input  wire [DATA_WIDTH-1:0]  s_axis_tdata,
     input  wire                   s_axis_tvalid,
-    output wire                   s_axis_tready,
+    output wire                    s_axis_tready,
     input  wire                   s_axis_tlast,
     /*
      * axi4 reciever streaming interface *OUTPUT*
@@ -147,11 +147,13 @@ module i2s_topm	#(
     output wire                   m_axis_tvalid,
     input  wire                   m_axis_tready,
     output wire                   m_axis_tlast,
+    
+    output wire                   conf_en_o,
     /*
      * Memory mapped axi4 slave
      */ 
-    input         axi_aclk,
-    input         axi_aresetn,
+    input         mms_axi_aclk,
+    input         mms_axi_aresetn,
     //AXI Write Address Channel
     input [DATA_WIDTH-1:0] mms_axi_awaddr,
     input [2:0]   mms_axi_awprot,
@@ -182,10 +184,18 @@ module i2s_topm	#(
  wire [5:0] conf_res_bclk;
  wire [4:0] conf_ratio_bclk;
  
+  wire conf_en;
+ wire conf_swap;
+ wire [5:0] conf_res;
+ wire [4:0] conf_ratio;
+ 
+ assign i2s_mclk_o = clock_12_288;
+ assign i2s_sck_o =  clock_3_072;
+ assign conf_en_o = conf_en_bclk;
  bits_sync
  #(.BUS_WIDTH (13))
  bits_sync_0 (
-    .i_clk_b (i_bclk),
+    .i_clk_b (clock_3_072),
     .i_data_a({conf_en,conf_swap,conf_res,conf_ratio}),
     .o_data_b({conf_en_bclk,conf_swap_bclk,conf_res_bclk,conf_ratio_bclk}));
 //-- TxConfig - Configuration register
@@ -194,8 +204,8 @@ module i2s_topm	#(
     .BASEADDR(32'h8000_2000)) 
     i2s_regmap (
 
-.axi_aclk(axi_aclk),
-.axi_aresetn(axi_aresetn),
+.axi_aclk(mms_axi_aclk),
+.axi_aresetn(mms_axi_aresetn),
     //AXI Write Address Channel
 .s_axi_awaddr(mms_axi_araddr),//Write is only necessary for CPU
 .s_axi_awprot(mms_axi_awprot),
@@ -223,12 +233,12 @@ module i2s_topm	#(
 .ctrl_reg_strobe(), // Strobe logic for register 'ctrl_reg' (pulsed when the register is written from the bus)
 .ctrl_reg_en(conf_en), // Value of register 'ctrl_reg'(), field 'en'
 .ctrl_reg_int_en(conf_inten), // Value of register 'ctrl_reg'(), field 'int_en'
-.ctrl_reg_ch_swap(), // Value of register 'ctrl_reg'(), field 'ch_swap'
+.ctrl_reg_ch_swap(conf_swap), // Value of register 'ctrl_reg'(), field 'ch_swap'
 .ctrl_reg_mlsbf(), // Value of register 'ctrl_reg'(), field 'mlsbf'
 .ctrl_reg_mhsbf(), // Value of register 'ctrl_reg'(), field 'mhsbf'
 .ctrl_reg_samp_res(conf_res), // Value of register 'ctrl_reg'(), field 'samp_res'
 .ctrl_reg_freq_ratio(conf_ratio));   
-   assign s_axis_tready = 1;
+   //assign s_axis_tready = 1;
     generate 
    if (IS_RECEIVER==1)
      i2s_codec #(
@@ -237,8 +247,8 @@ module i2s_topm	#(
         .IS_RECEIVER(1)
      )
      RECEIVER_DEC(
-        .i_bclk(i_bclk),
-        .i_ws_clk(i_wclk),
+        .i_bclk(clock_3_072),
+        .i_ws_clk(clock_0_0048),
         .conf_res(conf_res_bclk),
         .conf_ratio(conf_ratio_bclk),
         .conf_swap(conf_swap_bclk),
@@ -252,7 +262,8 @@ module i2s_topm	#(
         .m_axis_tready(m_axis_tready),
         .m_axis_tlast(m_axis_tvalid),
         .tx_data(),
-        .rx_data(rx_data)
+        .rx_data(rx_data),
+        .ws_clk_ret(i2s_ws_o)
    );      
    else
      i2s_codec #(
@@ -261,8 +272,8 @@ module i2s_topm	#(
         .IS_RECEIVER(0)
      )
      TRANSMITTER_DEC (
-        .i_bclk(i_bclk),
-        .i_ws_clk(i_wclk),
+        .i_bclk(clock_3_072),
+        .i_ws_clk(clock_0_0048),
         .conf_res(conf_res_bclk),
         .conf_ratio(conf_ratio_bclk),
         .conf_swap(conf_swap_bclk),
@@ -275,8 +286,9 @@ module i2s_topm	#(
         .m_axis_tvalid(),
         .m_axis_tready(1'b0),
         .m_axis_tlast(),
-        .tx_data(tx_data),
-        .rx_data()
+        .tx_data(i2s_tx_data_o),
+        .rx_data(),
+        .ws_clk_ret(i2s_ws_o)
      ); 
    endgenerate        
 endmodule    

@@ -8,26 +8,50 @@
 module atg_module(
     input clock_in,
     input reset_n,
-    output reg clk_0_0048,
-    output reg clk_3_072,
-    output wire clk_12_288
+    input core_clk_in,
+    input core_rst_n,
+    output reg clock_0_0048,
+    output reg clock_3_072,
+    output wire clock_12_288,
+    output reg latcher_pulse
     );
-    assign clk_12_288 = clock_in;
-    reg [7:0] count48;
-    reg [1:0] count3_072;
-       
-    always @(posedge clock_in or negedge reset_n)  
+    assign clock_12_288 = clock_in;
+    reg [4:0] count48;
+    reg count3_072;
+    reg latcher_clk_dl;
+    wire latcher_clk;
+    bits_sync
+    #(.BUS_WIDTH (1))
+     bits_sync_1 (
+        .i_clk_b (core_clk_in),
+        .i_data_a(clock_0_0048),
+        .o_data_b(latcher_clk));
+       always @(posedge core_clk_in) begin
+        if(!core_rst_n) begin
+            latcher_clk_dl <= 0;
+        end
+        else begin
+            latcher_clk_dl <= latcher_clk;
+            if(latcher_clk && !latcher_clk_dl) begin
+                latcher_pulse <= 1;
+            end
+            else begin
+                latcher_pulse <= 0;
+            end
+        end
+       end 
+    always @(negedge clock_3_072 or negedge reset_n)  
         begin
            if (!reset_n)
             begin
-                clk_0_0048 <= 1'b0;
+                clock_0_0048 <= 1'b0;
              end
-           else if (count48 == 8'd127)
+           else if (count48 == 5'd31)
  	          begin
-	             clk_0_0048 <= ~clk_0_0048;
+	             clock_0_0048 <= ~clock_0_0048;
 	           end 
 	       else 
-                clk_0_0048 <= clk_0_0048;
+                clock_0_0048 <= clock_0_0048;
         end
         
         
@@ -35,26 +59,34 @@ module atg_module(
             begin
                if (!reset_n)
                 begin
-                    clk_3_072 <= 1'b0;
+                    clock_3_072 <= 1'b0;
                  end
-               else if (count3_072 == 2'd1)
+               else if (count3_072 == 1)
                    begin
-                     clk_3_072 <= ~clk_3_072;
+                     clock_3_072 <= ~clock_3_072;
                    end 
                else 
-                    clk_3_072 <= clk_3_072;
+                    clock_3_072 <= clock_3_072;
             end
-        
+   always @(negedge clock_3_072 or negedge reset_n)
+                begin
+                    if (!reset_n)
+                     begin
+                         count48 <= 5'd0;
+                     end
+                    else
+                     begin
+                         count48 <= count48 + 5'b1;
+                     end 
+               end    
    always @(posedge clock_in or negedge reset_n)
        begin
            if (!reset_n)
             begin
-                count48 <= 8'd0;
                 count3_072 <= 2'd0;
             end
            else
             begin
-                count48 <= count48 + 1'b1;
                 count3_072 <= count3_072 + 1'b1;
             end 
       end      

@@ -120,8 +120,8 @@ module i2s_codec #(
       input wire i_bclk      ,
       input wire i_ws_clk    ,
       //Config options
-      input wire [4:0] conf_res    ,
-      input wire [5:0] conf_ratio  ,
+      input wire [5:0] conf_res    ,
+      input wire [4:0] conf_ratio  ,
       input wire conf_swap   ,
       input wire conf_en     ,
     /*
@@ -170,7 +170,6 @@ reg[8:0] temp_data=2**(ADDR_WIDTH-1);
  reg [31:0] samp_data;
    
 assign receiver = (IS_RECEIVER==1)?1'b1:1'b0;
-
 //-- Logic to generate clock signal, master mode
 assign i2s_sck_o = toggle;
 
@@ -197,16 +196,19 @@ else begin
 always@(negedge i_bclk) begin
     //Reset condition
     if(!conf_en) begin
-    
+        codec_state   <= 0;
+        samp_data     <= 0;
+        s_axis_tready <= 0;
+        tx_ws_clk     <= 0;
     end
     else begin
         s_axis_tready <= 0;
         case(codec_state)
         IDLE: begin
             if(i_ws_clk) begin
-                s_axis_tready <= 1;
                 samp_data <= s_axis_tdata;
                 codec_state   <= TX_DATA_CH0;
+                bit_cnt <= DATA_WIDTH-1;
             end
             else begin
                 
@@ -222,16 +224,17 @@ always@(negedge i_bclk) begin
             end
             
             if(bit_cnt == 0) begin
+                s_axis_tready <= 1;
                 codec_state <= TX_DATA_CH1;
-                bit_cnt = DATA_WIDTH;
-                samp_data <= s_axis_tdata;
+                bit_cnt = DATA_WIDTH-1;
+                //samp_data <= s_axis_tdata;
             end
             else begin
                 bit_cnt <= bit_cnt - 1;
             end
          end
          TX_DATA_CH1: begin
-            tx_ws_clk     <= 1;
+            tx_ws_clk     <= 0;
             if(bit_cnt > DATA_WIDTH-conf_res) begin
                 tx_data <= samp_data[bit_cnt];
             end
@@ -240,8 +243,9 @@ always@(negedge i_bclk) begin
             end
             
             if(bit_cnt == 0) begin
-                codec_state <= TX_DATA_CH1;
-                bit_cnt = DATA_WIDTH;
+                codec_state <= TX_DATA_CH0;
+                bit_cnt = DATA_WIDTH-1;
+                samp_data <= s_axis_tdata;
             end
             else begin
                 bit_cnt <= bit_cnt - 1;

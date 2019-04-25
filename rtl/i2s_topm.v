@@ -207,7 +207,7 @@ module i2s_topm	#(
 .axi_aclk(mms_axi_aclk),
 .axi_aresetn(mms_axi_aresetn),
     //AXI Write Address Channel
-.s_axi_awaddr(mms_axi_araddr),//Write is only necessary for CPU
+.s_axi_awaddr(mms_axi_awaddr),//Write is only necessary for CPU
 .s_axi_awprot(mms_axi_awprot),
 .s_axi_awvalid(mms_axi_awvalid),
 .s_axi_awready(mms_axi_awready),
